@@ -1,6 +1,7 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { Search, ShoppingBag, Heart, Trash2, Menu, X, ChevronDown, Check } from "lucide-react";
 import { useEffect, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { ThemeToggle } from "./theme-toggle";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -48,6 +49,7 @@ export function Navbar() {
           </div>
           <span className="text-base font-semibold tracking-tight">
             Smart<span className="text-brand-gradient">Campus</span>
+            <span className="ml-1 text-xs font-medium text-muted-foreground">Marketplace</span>
           </span>
         </Link>
 
@@ -76,11 +78,22 @@ export function Navbar() {
               <Button
                 variant="ghost"
                 size="sm"
-                className="hidden max-w-[220px] items-center gap-2 rounded-full sm:inline-flex"
+                className="hidden max-w-[220px] items-center gap-2 rounded-full sm:inline-flex transition-all hover:bg-secondary/60"
                 aria-label="Select campus"
               >
-                <span className="truncate text-sm font-medium">{campus}</span>
-                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                <motion.span
+                  className="truncate text-sm font-medium"
+                  animate={{ opacity: campus ? 1 : 0.6 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  {campus || "Select College"}
+                </motion.span>
+                <motion.div
+                  animate={{ rotate: campusOpen ? 180 : 0 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                </motion.div>
               </Button>
             </PopoverTrigger>
             <PopoverContent align="end" className="w-[280px] p-0">
@@ -98,8 +111,14 @@ export function Navbar() {
                           setCampusOpen(false);
                         }}
                       >
-                        <span className="flex-1">{c}</span>
-                        {c === campus ? <Check className="h-4 w-4 text-muted-foreground" /> : null}
+                        <motion.div
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          className="flex flex-1 items-center"
+                        >
+                          <span className="flex-1">{c}</span>
+                          {c === campus && <Check className="h-4 w-4 text-primary" />}
+                        </motion.div>
                       </CommandItem>
                     ))}
                   </CommandGroup>
@@ -181,22 +200,30 @@ export function Navbar() {
         </div>
       </div>
 
-      {open && (
-        <div className="border-t border-border/60 md:hidden">
-          <div className="mx-auto flex max-w-7xl flex-col gap-1 p-4">
-            {links.map((l) => (
-              <Link key={l.to} to={l.to} onClick={() => setOpen(false)}
-                className="rounded-lg px-3 py-2 text-sm font-medium hover:bg-secondary">
-                {l.label}
-              </Link>
-            ))}
-            <div className="mt-2 flex gap-2">
-              <Link to="/login" className="flex-1"><Button variant="outline" className="w-full">Sign in</Button></Link>
-              <Link to="/signup" className="flex-1"><Button className="w-full bg-brand-gradient">Get started</Button></Link>
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.2 }}
+            className="border-t border-border/60 md:hidden"
+          >
+            <div className="mx-auto flex max-w-7xl flex-col gap-1 p-4">
+              {links.map((l) => (
+                <Link key={l.to} to={l.to} onClick={() => setOpen(false)}
+                  className="rounded-lg px-3 py-2 text-sm font-medium hover:bg-secondary">
+                  {l.label}
+                </Link>
+              ))}
+              <div className="mt-2 flex gap-2">
+                <Link to="/login" className="flex-1"><Button variant="outline" className="w-full">Sign in</Button></Link>
+                <Link to="/signup" className="flex-1"><Button className="w-full bg-brand-gradient">Get started</Button></Link>
+              </div>
             </div>
-          </div>
-        </div>
-      )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </header>
   );
 }

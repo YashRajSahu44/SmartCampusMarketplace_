@@ -211,8 +211,12 @@ function Categories() {
 
 function Featured() {
   return (
-    <section className="bg-secondary/30 py-20">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+    <section className="relative py-20 overflow-hidden">
+      {/* Warm gradient background */}
+      <div className="absolute inset-0 bg-gradient-to-b from-background via-background to-amber-50/15 dark:to-amber-950/10" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(59,130,246,0.08),transparent_70%)]" />
+      
+      <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="mb-10 flex items-end justify-between">
           <div>
             <h2 className="font-display text-3xl font-semibold italic tracking-tight sm:text-4xl">Trending on campus</h2>
@@ -256,8 +260,10 @@ function FeaturedDeals() {
     { t: "Price-smart listings", d: "Discounts compared to original", icon: TrendingUp },
   ];
   return (
-    <section className="bg-secondary/30 py-20">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+    <section className="relative py-20 overflow-hidden">
+      <div className="absolute inset-0 bg-gradient-to-b from-background via-background to-amber-50/15 dark:to-amber-950/10" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_left,rgba(59,130,246,0.08),transparent_70%)]" />
+      <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="mb-10 flex items-end justify-between">
           <div>
             <h2 className="font-display text-3xl font-semibold tracking-tight sm:text-4xl">Campus highlights</h2>
@@ -272,7 +278,7 @@ function FeaturedDeals() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, margin: "-40px" }}
               transition={{ delay: i * 0.08 }}
-              className="rounded-2xl border border-border bg-card p-7 shadow-soft"
+              className="rounded-2xl border border-border bg-card p-7 shadow-soft hover:shadow-elegant transition-shadow"
             >
               <div className="grid h-11 w-11 place-items-center rounded-xl bg-secondary text-foreground">
                 <d.icon className="h-5 w-5" />
@@ -294,7 +300,10 @@ function HowItWorks() {
     { icon: MessageCircle, t: "Chat & meet up", d: "Message safely and coordinate a meet-up on campus." },
   ];
   return (
-    <section className="mx-auto max-w-7xl px-4 py-24 sm:px-6 lg:px-8">
+    <section className="relative py-24 overflow-hidden">
+      <div className="absolute inset-0 bg-gradient-to-b from-background via-background to-amber-50/15 dark:to-amber-950/10" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_right,rgba(59,130,246,0.08),transparent_70%)]" />
+      <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-2xl text-center">
             <h2 className="font-display text-3xl font-semibold italic tracking-tight sm:text-4xl">How it works</h2>
         <p className="mt-3 text-muted-foreground">Three steps from idea to handshake.</p>
@@ -318,6 +327,7 @@ function HowItWorks() {
           </motion.div>
         ))}
       </div>
+      </div>
     </section>
   );
 }
@@ -332,8 +342,10 @@ function Features() {
     { icon: MessageCircle, t: "Safe meet-up planner", d: "Coordinate locations and times right inside the chat." },
   ];
   return (
-    <section className="bg-secondary/30 py-24">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+    <section className="relative py-24 overflow-hidden">
+      <div className="absolute inset-0 bg-gradient-to-b from-background via-background to-amber-50/15 dark:to-amber-950/10" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,rgba(59,130,246,0.08),transparent_70%)]" />
+      <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-2xl text-center">
           <h2 className="font-display text-3xl font-semibold italic tracking-tight sm:text-4xl">Built for the way students actually trade</h2>
           <p className="mt-3 text-muted-foreground">Trust, speed, and intelligence baked into every screen.</p>
@@ -361,34 +373,38 @@ function Features() {
 
 function Testimonials() {
   return (
-    <section className="mx-auto max-w-7xl px-4 py-24 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-2xl text-center">
-        <h2 className="font-display text-3xl font-semibold italic tracking-tight sm:text-4xl">Loved by students</h2>
-        <p className="mt-3 text-muted-foreground">Real stories from verified campus users.</p>
-      </div>
-      <div className="mt-14 grid gap-5 md:grid-cols-3">
-        {testimonials.map((t, i) => (
-          <motion.div
-            key={t.name}
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ delay: i * 0.1 }}
-            className="rounded-2xl border border-border bg-card p-7 shadow-soft"
-          >
-            <div className="flex gap-0.5 text-foreground/80">
-              {[...Array(5)].map((_, j) => <Star key={j} className="h-4 w-4 fill-current" />)}
-            </div>
-            <p className="mt-4 text-sm leading-relaxed">"{t.quote}"</p>
-            <div className="mt-5 flex items-center gap-3 border-t border-border pt-5">
-              <img src={t.avatar} alt="" className="h-9 w-9 rounded-full" />
-              <div>
-                <div className="text-sm font-semibold">{t.name}</div>
-                <div className="text-xs text-muted-foreground">{t.college}</div>
+    <section className="relative py-24 overflow-hidden">
+      <div className="absolute inset-0 bg-gradient-to-b from-background via-background to-amber-50/15 dark:to-amber-950/10" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom,rgba(59,130,246,0.08),transparent_70%)]" />
+      <div className="relative mx-auto max-w-7xl px-4 py-24 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-2xl text-center">
+          <h2 className="font-display text-3xl font-semibold italic tracking-tight sm:text-4xl">Loved by students</h2>
+          <p className="mt-3 text-muted-foreground">Real stories from verified campus users.</p>
+        </div>
+        <div className="mt-14 grid gap-5 md:grid-cols-3">
+          {testimonials.map((t, i) => (
+            <motion.div
+              key={t.name}
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: i * 0.1 }}
+              className="rounded-2xl border border-border bg-card p-7 shadow-soft"
+            >
+              <div className="flex gap-0.5 text-foreground/80">
+                {[...Array(5)].map((_, j) => <Star key={j} className="h-4 w-4 fill-current" />)}
               </div>
-            </div>
-          </motion.div>
-        ))}
+              <p className="mt-4 text-sm leading-relaxed">"{t.quote}"</p>
+              <div className="mt-5 flex items-center gap-3 border-t border-border pt-5">
+                <img src={t.avatar} alt="" className="h-9 w-9 rounded-full" />
+                <div>
+                  <div className="text-sm font-semibold">{t.name}</div>
+                  <div className="text-xs text-muted-foreground">{t.college}</div>
+                </div>
+              </div>
+            </motion.div>
+          ))}
+        </div>
       </div>
     </section>
   );
@@ -396,9 +412,13 @@ function Testimonials() {
 
 function CTA() {
   return (
-    <section className="px-4 py-24 sm:px-6 lg:px-8">
-      <div className="relative mx-auto max-w-5xl overflow-hidden rounded-3xl bg-brand-gradient p-12 text-center text-primary-foreground shadow-elegant sm:p-16">
+    <section className="relative px-4 py-24 sm:px-6 lg:px-8 overflow-hidden">
+      {/* Warm gradient background */}
+      <div className="absolute inset-0 bg-gradient-to-b from-background via-background to-amber-50/20 dark:to-amber-950/10" />
+      
+      <div className="relative mx-auto max-w-5xl overflow-hidden rounded-3xl bg-gradient-to-br from-brand-blue/90 via-brand-blue/80 to-brand-blue/70 p-12 text-center text-primary-foreground shadow-elegant sm:p-16">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(255,255,255,0.18),transparent_60%)]" />
+        <div className="absolute -right-32 -top-32 h-64 w-64 rounded-full bg-[radial-gradient(circle,rgba(255,255,255,0.08),transparent_65%)] blur-3xl" />
         <div className="relative">
           <h2 className="font-display text-3xl font-semibold italic tracking-tight sm:text-5xl">
             Your campus marketplace is one tap away.

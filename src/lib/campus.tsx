@@ -1,19 +1,19 @@
 import * as React from "react";
 
 export const CAMPUSES = [
-  "IIT Delhi",
-  "IIT Bombay",
-  "NIT Trichy",
-  "BITS Pilani",
-  "VIT Vellore",
-  "SRM University",
-  "Delhi University",
+  "Technocrats",
+  "LNCT",
+  "Oriental",
+  "SIRT",
+  "Bansal",
+  "RGPV",
+  "MANIT",
 ] as const;
 
 export type CampusName = (typeof CAMPUSES)[number];
 
 type CampusCtx = {
-  campus: CampusName;
+  campus: CampusName | null;
   setCampus: (c: CampusName) => void;
 };
 
@@ -22,14 +22,14 @@ const CampusContext = React.createContext<CampusCtx | null>(null);
 const STORAGE_KEY = "smartcampus:campus:v1";
 
 export function CampusProvider({ children }: { children: React.ReactNode }) {
-  const [campus, setCampusState] = React.useState<CampusName>(() => {
+  const [campus, setCampusState] = React.useState<CampusName | null>(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw && (CAMPUSES as readonly string[]).includes(raw)) return raw as CampusName;
     } catch {
       // ignore
     }
-    return "IIT Delhi";
+    return null;
   });
 
   const setCampus = React.useCallback((c: CampusName) => {

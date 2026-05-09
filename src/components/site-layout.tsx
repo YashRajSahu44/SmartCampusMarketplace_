@@ -1,6 +1,7 @@
 import { Outlet } from "@tanstack/react-router";
 import { Navbar } from "./navbar";
 import { Footer } from "./footer";
+import { AIChatbot } from "./ai-chatbot";
 
 export function SiteLayout({ withFooter = true }: { withFooter?: boolean }) {
   return (
@@ -8,6 +9,7 @@ export function SiteLayout({ withFooter = true }: { withFooter?: boolean }) {
       <Navbar />
       <main className="flex-1"><Outlet /></main>
       {withFooter && <Footer />}
+      <AIChatbot />
     </div>
   );
 }
