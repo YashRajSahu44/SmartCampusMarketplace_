@@ -1,29 +1,35 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Sparkles, ShieldCheck, Zap, Users, ArrowRight, Search,
   BadgeCheck, MessageCircle, Bot, TrendingUp, Star,
+  HandHeart, Clock, MapPin, GraduationCap, IndianRupee,
 } from "lucide-react";
+import { useState } from "react";
 import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
 import { ProductCard } from "@/components/product-card";
 import { CategoryIcon } from "@/components/category-icon";
 import { Button } from "@/components/ui/button";
-import { products, categories, testimonials } from "@/lib/mock-data";
+import { products, categories, testimonials, itemRequests, type ItemRequest } from "@/lib/mock-data";
+import { RequestItemModal } from "@/components/request-item-modal";
+import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/")({ component: Landing });
 
 function Landing() {
+  const [requestModalOpen, setRequestModalOpen] = useState(false);
   return (
     <div className="flex min-h-screen flex-col">
       <Navbar />
       <main>
-        <Hero />
+        <Hero onRequestItem={() => setRequestModalOpen(true)} />
         <Stats />
         <MarketplacePulse />
         <Categories />
         <Featured />
-        <RecentlyListed />
+        <RequestedByStudents />
         <FeaturedDeals />
         <HowItWorks />
         <Features />
@@ -31,11 +37,12 @@ function Landing() {
         <CTA />
       </main>
       <Footer />
+      <RequestItemModal open={requestModalOpen} onClose={() => setRequestModalOpen(false)} />
     </div>
   );
 }
 
-function Hero() {
+function Hero({ onRequestItem }: { onRequestItem: () => void }) {
   return (
     <section className="relative overflow-hidden bg-hero-gradient">
       <div className="pointer-events-none absolute inset-0">
@@ -74,6 +81,17 @@ function Hero() {
                 Sell something
               </Button>
             </Link>
+            <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
+              <Button
+                size="lg"
+                variant="outline"
+                onClick={onRequestItem}
+                className="rounded-full border-primary/30 px-7 text-primary hover:bg-primary/5 hover:border-primary/50"
+              >
+                <HandHeart className="mr-1.5 h-4 w-4" />
+                Request Item
+              </Button>
+            </motion.div>
           </div>
 
           <div className="mx-auto mt-10 flex max-w-xl items-center gap-2 rounded-full border border-border bg-card px-4 py-3 shadow-soft">
@@ -213,7 +231,7 @@ function Featured() {
   return (
     <section className="relative py-20 overflow-hidden">
       {/* Warm gradient background */}
-      <div className="absolute inset-0 bg-gradient-to-b from-background via-background to-amber-50/15 dark:to-amber-950/10" />
+      <div className="absolute inset-0 bg-gradient-to-b from-amber-50/20 via-background to-amber-50/50 dark:from-amber-950/10 dark:via-background dark:to-amber-950/20" />
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(59,130,246,0.08),transparent_70%)]" />
       
       <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -232,26 +250,186 @@ function Featured() {
   );
 }
 
-function RecentlyListed() {
+function RequestedByStudents() {
+  const [provideFor, setProvideFor] = useState<ItemRequest | null>(null);
   return (
-    <section className="py-20">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+    <section className="relative py-20 overflow-hidden">
+      {/* Subtle gradient background */}
+      <div className="absolute inset-0 bg-gradient-to-b from-amber-50/30 via-background to-blue-50/20 dark:from-amber-950/15 dark:via-background dark:to-blue-950/10" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(59,130,246,0.06),transparent_70%)]" />
+
+      <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="mb-10 flex items-end justify-between">
           <div>
-            <h2 className="font-display text-3xl font-semibold italic tracking-tight sm:text-4xl">Recently listed</h2>
-            <p className="mt-2 text-muted-foreground">Fresh items posted by students across campuses.</p>
+            <span className="mb-2 inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-xs font-medium text-primary">
+              <HandHeart className="h-3 w-3" /> Live requests
+            </span>
+            <h2 className="mt-2 font-display text-3xl font-semibold italic tracking-tight sm:text-4xl">Requested by students</h2>
+            <p className="mt-2 text-muted-foreground">Students are looking for these items right now. Can you help?</p>
           </div>
-          <Link to="/marketplace" className="hidden text-sm font-medium text-primary hover:underline sm:block">
-            See latest →
-          </Link>
         </div>
-        <div className="grid grid-cols-2 gap-5 md:grid-cols-3 lg:grid-cols-4">
-          {products.slice(4, 12).map((p, i) => <ProductCard key={p.id} product={p} index={i} />)}
+        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          {itemRequests.map((req, i) => (
+            <RequestCard key={req.id} request={req} index={i} onProvide={() => setProvideFor(req)} />
+          ))}
         </div>
       </div>
+
+      <ProvideModal request={provideFor} onClose={() => setProvideFor(null)} />
     </section>
   );
 }
+
+function RequestCard({ request, index, onProvide }: { request: ItemRequest; index: number; onProvide: () => void }) {
+  const urgencyColors: Record<string, string> = {
+    Urgent: "bg-red-500/15 text-red-600 dark:text-red-400 border-red-500/30",
+    High: "bg-orange-500/15 text-orange-600 dark:text-orange-400 border-orange-500/30",
+    Medium: "bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/30",
+    Low: "bg-green-500/15 text-green-600 dark:text-green-400 border-green-500/30",
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: "-40px" }}
+      transition={{ delay: index * 0.07 }}
+      whileHover={{ y: -4, transition: { duration: 0.2 } }}
+      className="group relative overflow-hidden rounded-2xl border border-border bg-card p-6 shadow-soft transition-shadow hover:shadow-elegant"
+    >
+      {/* Subtle gradient accent */}
+      <div className="absolute -right-16 -top-16 h-32 w-32 rounded-full bg-[radial-gradient(circle,rgba(59,130,246,0.1),transparent_65%)] blur-2xl transition-opacity group-hover:opacity-100 opacity-0" />
+
+      {/* Header: urgency + time */}
+      <div className="flex items-center justify-between">
+        <span className={cn("inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold", urgencyColors[request.urgency])}>
+          {request.urgency === "Urgent" && "🔥"} {request.urgency}
+        </span>
+        <span className="flex items-center gap-1 text-xs text-muted-foreground">
+          <Clock className="h-3 w-3" /> {request.postedAgo}
+        </span>
+      </div>
+
+      {/* Item name */}
+      <h3 className="mt-3 text-base font-semibold leading-snug">{request.itemName}</h3>
+      <p className="mt-1.5 line-clamp-2 text-sm text-muted-foreground">{request.description}</p>
+
+      {/* Tags row */}
+      <div className="mt-4 flex flex-wrap gap-2">
+        <span className="inline-flex items-center gap-1 rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-secondary-foreground">
+          <IndianRupee className="h-3 w-3" /> ₹{request.budgetMin.toLocaleString("en-IN")} - ₹{request.budgetMax.toLocaleString("en-IN")}
+        </span>
+        <span className="inline-flex items-center gap-1 rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-secondary-foreground">
+          <GraduationCap className="h-3 w-3" /> {request.department}
+        </span>
+        <span className="inline-flex items-center gap-1 rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-secondary-foreground">
+          <MapPin className="h-3 w-3" /> {request.campus}
+        </span>
+      </div>
+
+      {/* Condition */}
+      <div className="mt-3 text-xs text-muted-foreground">Preferred: <span className="font-medium text-foreground">{request.condition}</span></div>
+
+      {/* Student + CTA */}
+      <div className="mt-4 flex items-center justify-between border-t border-border pt-4">
+        <div className="flex items-center gap-2">
+          <img src={request.student.avatar} alt="" className="h-7 w-7 rounded-full" />
+          <div>
+            <div className="flex items-center gap-1 text-xs font-medium">
+              {request.student.name}
+              {request.student.verified && <BadgeCheck className="h-3 w-3 text-primary" />}
+            </div>
+          </div>
+        </div>
+        <motion.div whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}>
+          <Button
+            size="sm"
+            onClick={onProvide}
+            className="rounded-full bg-brand-gradient px-4 text-xs text-primary-foreground shadow-soft hover:opacity-90"
+          >
+            I Can Provide This
+          </Button>
+        </motion.div>
+      </div>
+    </motion.div>
+  );
+}
+
+function ProvideModal({ request, onClose }: { request: ItemRequest | null; onClose: () => void }) {
+  const [message, setMessage] = useState("");
+  const [sending, setSending] = useState(false);
+
+  const handleSend = async () => {
+    if (!message.trim()) return;
+    setSending(true);
+    await new Promise((r) => setTimeout(r, 800));
+    setSending(false);
+    toast.success("Message sent!", { description: `${request?.student.name} will be notified. Check your messages for a reply.` });
+    setMessage("");
+    onClose();
+  };
+
+  return (
+    <AnimatePresence>
+      {request && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+          onClick={(e) => e.target === e.currentTarget && onClose()}
+        >
+          <div className="absolute inset-0 bg-foreground/40 backdrop-blur-sm" />
+          <motion.div
+            initial={{ opacity: 0, y: 20, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.97 }}
+            transition={{ duration: 0.25 }}
+            className="relative w-full max-w-md overflow-hidden rounded-2xl border border-border bg-card shadow-elegant"
+          >
+            <div className="absolute left-0 right-0 top-0 h-1 bg-brand-gradient" />
+            <div className="p-6">
+              <h3 className="text-base font-semibold">Respond to request</h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Let <span className="font-medium text-foreground">{request.student.name}</span> know you can provide:
+              </p>
+              <div className="mt-3 rounded-xl border border-border bg-secondary/50 p-3">
+                <div className="text-sm font-medium">{request.itemName}</div>
+                <div className="mt-1 text-xs text-muted-foreground">Budget: ₹{request.budgetMin.toLocaleString("en-IN")} - ₹{request.budgetMax.toLocaleString("en-IN")}</div>
+              </div>
+              <textarea
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                placeholder="Hi! I have this item available. It's in great condition and I can meet you at..."
+                rows={3}
+                className="mt-4 w-full resize-none rounded-xl border border-border bg-background px-4 py-2.5 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 placeholder:text-muted-foreground"
+              />
+              <div className="mt-4 flex justify-end gap-2">
+                <Button variant="ghost" size="sm" onClick={onClose}>Cancel</Button>
+                <Button
+                  size="sm"
+                  disabled={!message.trim() || sending}
+                  onClick={handleSend}
+                  className="rounded-full bg-brand-gradient px-5 text-primary-foreground shadow-soft hover:opacity-90"
+                >
+                  {sending ? (
+                    <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: "linear" }} className="h-4 w-4 rounded-full border-2 border-primary-foreground border-t-transparent" />
+                  ) : (
+                    <>
+                      <MessageCircle className="mr-1.5 h-3.5 w-3.5" />
+                      Send Message
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
 
 function FeaturedDeals() {
   const deals = [
@@ -261,7 +439,7 @@ function FeaturedDeals() {
   ];
   return (
     <section className="relative py-20 overflow-hidden">
-      <div className="absolute inset-0 bg-gradient-to-b from-background via-background to-amber-50/15 dark:to-amber-950/10" />
+      <div className="absolute inset-0 bg-gradient-to-b from-amber-50/20 via-background to-amber-50/50 dark:from-amber-950/10 dark:via-background dark:to-amber-950/20" />
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_left,rgba(59,130,246,0.08),transparent_70%)]" />
       <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="mb-10 flex items-end justify-between">
@@ -301,7 +479,7 @@ function HowItWorks() {
   ];
   return (
     <section className="relative py-24 overflow-hidden">
-      <div className="absolute inset-0 bg-gradient-to-b from-background via-background to-amber-50/15 dark:to-amber-950/10" />
+      <div className="absolute inset-0 bg-gradient-to-b from-amber-50/20 via-background to-amber-50/50 dark:from-amber-950/10 dark:via-background dark:to-amber-950/20" />
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_right,rgba(59,130,246,0.08),transparent_70%)]" />
       <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-2xl text-center">
@@ -343,7 +521,7 @@ function Features() {
   ];
   return (
     <section className="relative py-24 overflow-hidden">
-      <div className="absolute inset-0 bg-gradient-to-b from-background via-background to-amber-50/15 dark:to-amber-950/10" />
+      <div className="absolute inset-0 bg-gradient-to-b from-amber-50/20 via-background to-amber-50/50 dark:from-amber-950/10 dark:via-background dark:to-amber-950/20" />
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,rgba(59,130,246,0.08),transparent_70%)]" />
       <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-2xl text-center">
@@ -374,7 +552,7 @@ function Features() {
 function Testimonials() {
   return (
     <section className="relative py-24 overflow-hidden">
-      <div className="absolute inset-0 bg-gradient-to-b from-background via-background to-amber-50/15 dark:to-amber-950/10" />
+      <div className="absolute inset-0 bg-gradient-to-b from-amber-50/20 via-background to-amber-50/50 dark:from-amber-950/10 dark:via-background dark:to-amber-950/20" />
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom,rgba(59,130,246,0.08),transparent_70%)]" />
       <div className="relative mx-auto max-w-7xl px-4 py-24 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-2xl text-center">
@@ -414,26 +592,26 @@ function CTA() {
   return (
     <section className="relative px-4 py-24 sm:px-6 lg:px-8 overflow-hidden">
       {/* Warm gradient background */}
-      <div className="absolute inset-0 bg-gradient-to-b from-background via-background to-amber-50/20 dark:to-amber-950/10" />
+      <div className="absolute inset-0 bg-gradient-to-b from-amber-50/20 via-background to-amber-50/60 dark:from-amber-950/10 dark:via-background dark:to-amber-950/30" />
       
-      <div className="relative mx-auto max-w-5xl overflow-hidden rounded-3xl bg-gradient-to-br from-brand-blue/90 via-brand-blue/80 to-brand-blue/70 p-12 text-center text-primary-foreground shadow-elegant sm:p-16">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(255,255,255,0.18),transparent_60%)]" />
-        <div className="absolute -right-32 -top-32 h-64 w-64 rounded-full bg-[radial-gradient(circle,rgba(255,255,255,0.08),transparent_65%)] blur-3xl" />
+      <div className="relative mx-auto max-w-5xl overflow-hidden rounded-3xl border border-amber-200/60 bg-gradient-to-br from-amber-50 via-orange-50/80 to-yellow-50 p-12 text-center shadow-elegant dark:border-amber-800/30 dark:from-amber-950/40 dark:via-orange-950/30 dark:to-yellow-950/40 sm:p-16">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(251,191,36,0.12),transparent_60%)]" />
+        <div className="absolute -right-32 -top-32 h-64 w-64 rounded-full bg-[radial-gradient(circle,rgba(251,191,36,0.08),transparent_65%)] blur-3xl" />
         <div className="relative">
-          <h2 className="font-display text-3xl font-semibold italic tracking-tight sm:text-5xl">
+          <h2 className="font-display text-3xl font-semibold italic tracking-tight text-foreground sm:text-5xl">
             Your campus marketplace is one tap away.
           </h2>
-          <p className="mx-auto mt-4 max-w-xl text-base opacity-90">
+          <p className="mx-auto mt-4 max-w-xl text-base text-muted-foreground">
             Join 25,000+ verified students already buying smarter.
           </p>
           <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
             <Link to="/signup">
-              <Button size="lg" className="rounded-full bg-background px-8 text-foreground hover:bg-background/90">
+              <Button size="lg" className="rounded-full bg-brand-gradient px-8 text-primary-foreground shadow-elegant hover:opacity-90">
                 Get started — free
               </Button>
             </Link>
             <Link to="/marketplace">
-              <Button size="lg" variant="outline" className="rounded-full border-primary-foreground/30 bg-transparent px-8 text-primary-foreground hover:bg-primary-foreground/10">
+              <Button size="lg" variant="outline" className="rounded-full border-border px-8 text-foreground hover:bg-secondary">
                 Browse listings
               </Button>
             </Link>

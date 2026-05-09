@@ -308,3 +308,105 @@ export const sampleMessages = [
   { from: "me", text: "Sure, library entrance at 5 PM works?", time: "10:35" },
   { from: "them", text: "Perfect. See you there 👍", time: "10:36" },
 ];
+
+export type ItemRequest = {
+  id: string;
+  itemName: string;
+  category: Category;
+  budgetMin: number;
+  budgetMax: number;
+  condition: string;
+  description: string;
+  urgency: "Low" | "Medium" | "High" | "Urgent";
+  campus: string;
+  department: string;
+  postedAgo: string;
+  student: { name: string; avatar: string; verified: boolean };
+};
+
+export const itemRequests: ItemRequest[] = [
+  {
+    id: "r1",
+    itemName: "Engineering Drawing Kit (Drafter Set)",
+    category: "Lab Equipment",
+    budgetMin: 200,
+    budgetMax: 500,
+    condition: "Good or better",
+    description: "Need a complete drafter set with T-square, set squares, protractor and compass for ED lab starting next week.",
+    urgency: "High",
+    campus: "LNCT",
+    department: "Mechanical",
+    postedAgo: "20 min ago",
+    student: { name: "Rahul Verma", avatar: "https://i.pravatar.cc/120?img=52", verified: true },
+  },
+  {
+    id: "r2",
+    itemName: "Hostel Room Cooler (Desert/Personal)",
+    category: "Hostel Essentials",
+    budgetMin: 1500,
+    budgetMax: 3500,
+    condition: "Any working condition",
+    description: "Desperately need a portable cooler for the summer. My room doesn't have AC. Even a table fan works.",
+    urgency: "Urgent",
+    campus: "Technocrats",
+    department: "CSE",
+    postedAgo: "1 hour ago",
+    student: { name: "Priya Nair", avatar: "https://i.pravatar.cc/120?img=44", verified: true },
+  },
+  {
+    id: "r3",
+    itemName: "Dell/HP 24\" Monitor (1080p)",
+    category: "Electronics",
+    budgetMin: 4000,
+    budgetMax: 8000,
+    condition: "Like New",
+    description: "Looking for a decent external monitor for coding and design work. HDMI input preferred. No dead pixels.",
+    urgency: "Medium",
+    campus: "MANIT",
+    department: "CSE",
+    postedAgo: "3 hours ago",
+    student: { name: "Arjun Khanna", avatar: "https://i.pravatar.cc/120?img=18", verified: true },
+  },
+  {
+    id: "r4",
+    itemName: "DSA + OS Handwritten Notes (Sem 4)",
+    category: "Notes",
+    budgetMin: 80,
+    budgetMax: 250,
+    condition: "Any",
+    description: "Need topper notes for Data Structures and Operating Systems. Diagrams and PYQ solutions preferred.",
+    urgency: "High",
+    campus: "SIRT",
+    department: "CSE",
+    postedAgo: "45 min ago",
+    student: { name: "Kavya Joshi", avatar: "https://i.pravatar.cc/120?img=41", verified: false },
+  },
+  {
+    id: "r5",
+    itemName: "Casio FX-991EX Scientific Calculator",
+    category: "Gadgets",
+    budgetMin: 400,
+    budgetMax: 800,
+    condition: "Good",
+    description: "My calculator broke before exams. Need a replacement ASAP. Casio EX or ES Plus model preferred.",
+    urgency: "Urgent",
+    campus: "RGPV",
+    department: "ECE",
+    postedAgo: "30 min ago",
+    student: { name: "Siddharth Rao", avatar: "https://i.pravatar.cc/120?img=60", verified: true },
+  },
+  {
+    id: "r6",
+    itemName: "Foldable Study Table",
+    category: "Furniture",
+    budgetMin: 500,
+    budgetMax: 1200,
+    condition: "Good or better",
+    description: "Need a compact foldable study table for my hostel room. Wood or metal frame, doesn't matter. Must fit near bed.",
+    urgency: "Low",
+    campus: "Oriental",
+    department: "MBA",
+    postedAgo: "5 hours ago",
+    student: { name: "Nisha Agarwal", avatar: "https://i.pravatar.cc/120?img=25", verified: true },
+  },
+];

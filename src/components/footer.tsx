@@ -3,7 +3,7 @@ import { ShoppingBag, Github, Twitter, Instagram } from "lucide-react";
 
 export function Footer() {
   return (
-    <footer className="relative border-t border-border/60 bg-gradient-to-b from-background via-background to-amber-50/20 dark:to-amber-950/10 overflow-hidden">
+    <footer className="relative border-t border-border/60 bg-gradient-to-b from-amber-50/20 via-background to-amber-50/60 dark:from-amber-950/10 dark:via-background dark:to-amber-950/30 overflow-hidden">
       {/* Warm gradient overlays */}
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(59,130,246,0.08),transparent_70%)]" />
       <div className="relative mx-auto grid max-w-7xl gap-10 px-4 py-14 sm:px-6 lg:grid-cols-5 lg:px-8">

@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Search, SlidersHorizontal, X } from "lucide-react";
+import { Search, SlidersHorizontal, X, ChevronDown, Check, MapPin } from "lucide-react";
 import { useMemo, useState } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
 import { ProductCard } from "@/components/product-card";
@@ -9,6 +9,7 @@ import { CategoryIcon } from "@/components/category-icon";
 import { Button } from "@/components/ui/button";
 import { products, categories, type Category } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
+import { CAMPUSES } from "@/lib/campus";
 
 type SearchParams = { category?: string };
 
@@ -27,6 +28,13 @@ function MarketplacePage() {
   const [maxPrice, setMaxPrice] = useState<number>(60000);
   const [verifiedOnly, setVerifiedOnly] = useState(false);
   const [sort, setSort] = useState<"new" | "low" | "high">("new");
+  
+  const [buyRent, setBuyRent] = useState<"all" | "buy" | "rent">("all");
+  const [departments, setDepartments] = useState<string[]>([]);
+  const [availabilities, setAvailabilities] = useState<string[]>(["Available"]);
+  const [recentlyAdded, setRecentlyAdded] = useState(false);
+  const [negotiable, setNegotiable] = useState(false);
+  const [selectedCampuses, setSelectedCampuses] = useState<string[]>([]);
 
   const filtered = useMemo(() => {
     let list = products.filter((p) => {
@@ -40,10 +48,11 @@ function MarketplacePage() {
     if (sort === "low") list = [...list].sort((a, b) => a.price - b.price);
     if (sort === "high") list = [...list].sort((a, b) => b.price - a.price);
     return list;
-  }, [activeCat, conditions, maxPrice, verifiedOnly, query, sort]);
+  }, [activeCat, conditions, maxPrice, verifiedOnly, query, sort, buyRent, departments, availabilities, recentlyAdded, negotiable, selectedCampuses]);
 
-  const toggleCondition = (c: string) =>
-    setConditions((cs) => (cs.includes(c) ? cs.filter((x) => x !== c) : [...cs, c]));
+  const toggleArrayItem = (setter: React.Dispatch<React.SetStateAction<string[]>>, item: string) => {
+    setter((prev) => prev.includes(item) ? prev.filter((x) => x !== item) : [...prev, item]);
+  };
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -64,24 +73,46 @@ function MarketplacePage() {
                   className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
                 />
               </div>
-              <select
-                value={sort}
-                onChange={(e) => setSort(e.target.value as typeof sort)}
-                className="rounded-full border border-border bg-card px-4 py-3 text-sm shadow-soft outline-none"
-              >
-                <option value="new">Newest</option>
-                <option value="low">Price: low to high</option>
-                <option value="high">Price: high to low</option>
-              </select>
+              <div className="flex gap-2 sm:contents">
+                <button
+                  onClick={() => document.getElementById('mobile-filters')?.classList.toggle('hidden')}
+                  className="flex flex-1 items-center justify-center gap-2 rounded-full border border-border bg-card px-4 py-3 text-sm font-medium shadow-soft transition hover:bg-secondary lg:hidden"
+                >
+                  <SlidersHorizontal className="h-4 w-4" /> Filters
+                </button>
+                <select
+                  value={sort}
+                  onChange={(e) => setSort(e.target.value as typeof sort)}
+                  className="flex-1 rounded-full border border-border bg-card px-4 py-3 text-sm shadow-soft outline-none sm:flex-none"
+                >
+                  <option value="new">Newest</option>
+                  <option value="low">Price: low to high</option>
+                  <option value="high">Price: high to low</option>
+                </select>
+              </div>
             </div>
           </div>
         </section>
 
         <div className="mx-auto grid max-w-7xl gap-8 px-4 py-10 sm:px-6 lg:grid-cols-[260px_1fr] lg:px-8">
-          <aside className="hidden lg:block">
-            <div className="sticky top-24 space-y-6 rounded-2xl border border-border bg-card p-5">
-              <div className="flex items-center gap-2 text-sm font-semibold">
-                <SlidersHorizontal className="h-4 w-4" /> Filters
+          <aside id="mobile-filters" className="hidden lg:block">
+            <div className="sticky top-24 space-y-1 rounded-2xl border border-border bg-card p-5 shadow-soft">
+              <div className="mb-2 flex items-center justify-between pb-2">
+                <div className="flex items-center gap-2 text-sm font-semibold">
+                  <SlidersHorizontal className="h-4 w-4" /> Filters
+                </div>
+                {(activeCat || conditions.length > 0 || maxPrice < 60000 || verifiedOnly || buyRent !== "all" || departments.length > 0 || availabilities.length > 1 || recentlyAdded || negotiable || selectedCampuses.length > 0) && (
+                  <button
+                    onClick={() => {
+                      setActiveCat(null); setConditions([]); setMaxPrice(60000); setVerifiedOnly(false);
+                      setBuyRent("all"); setDepartments([]); setAvailabilities(["Available"]);
+                      setRecentlyAdded(false); setNegotiable(false); setSelectedCampuses([]);
+                    }}
+                    className="text-xs font-medium text-primary hover:underline"
+                  >
+                    Reset
+                  </button>
+                )}
               </div>
 
               <FilterBlock title="Category">
@@ -116,17 +147,52 @@ function MarketplacePage() {
                 </div>
               </FilterBlock>
 
+              <FilterBlock title="Transaction Type">
+                <div className="flex rounded-lg border border-border bg-secondary/50 p-1">
+                  {["all", "buy", "rent"].map((t) => (
+                    <button
+                      key={t}
+                      onClick={() => setBuyRent(t as any)}
+                      className={cn(
+                        "flex-1 rounded-md py-1.5 text-xs font-medium capitalize transition",
+                        buyRent === t ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      {t}
+                    </button>
+                  ))}
+                </div>
+              </FilterBlock>
+
+              <FilterBlock title={`Price range · ₹0 - ₹${maxPrice.toLocaleString("en-IN")}`}>
+                <input
+                  type="range" min={100} max={60000} step={100}
+                  value={maxPrice}
+                  onChange={(e) => setMaxPrice(Number(e.target.value))}
+                  className="w-full accent-primary"
+                />
+                <div className="mt-4 flex items-center gap-2 text-sm">
+                  <label className="flex cursor-pointer items-center gap-2">
+                    <div className={cn("grid h-4 w-4 place-items-center rounded border transition", negotiable ? "border-primary bg-primary text-primary-foreground" : "border-input")}>
+                      {negotiable && <Check className="h-3 w-3" />}
+                    </div>
+                    <input type="checkbox" checked={negotiable} onChange={(e) => setNegotiable(e.target.checked)} className="hidden" />
+                    Negotiable only
+                  </label>
+                </div>
+              </FilterBlock>
+
               <FilterBlock title="Condition">
                 <div className="flex flex-wrap gap-2">
-                  {["New", "Like New", "Good", "Fair"].map((c) => (
+                  {["New", "Like New", "Good", "Used"].map((c) => (
                     <button
                       key={c}
-                      onClick={() => toggleCondition(c)}
+                      onClick={() => toggleArrayItem(setConditions, c)}
                       className={cn(
-                        "rounded-full border px-3 py-1 text-xs transition",
+                        "rounded-full border px-3 py-1.5 text-xs transition",
                         conditions.includes(c)
-                          ? "border-primary bg-primary text-primary-foreground"
-                          : "border-border hover:border-primary/40",
+                          ? "border-primary bg-primary/10 text-primary font-medium"
+                          : "border-border hover:border-primary/40 bg-card hover:bg-secondary/50",
                       )}
                     >
                       {c}
@@ -135,25 +201,66 @@ function MarketplacePage() {
                 </div>
               </FilterBlock>
 
-              <FilterBlock title={`Max price · ₹${maxPrice.toLocaleString("en-IN")}`}>
-                <input
-                  type="range" min={100} max={60000} step={100}
-                  value={maxPrice}
-                  onChange={(e) => setMaxPrice(Number(e.target.value))}
-                  className="w-full accent-[var(--primary)]"
-                />
+              <FilterBlock title="Department">
+                <div className="space-y-2">
+                  {["CSE", "Mechanical", "Civil", "ECE", "MBA"].map((d) => (
+                    <label key={d} className="flex cursor-pointer items-center gap-2 text-sm">
+                      <div className={cn("grid h-4 w-4 place-items-center rounded border transition", departments.includes(d) ? "border-primary bg-primary text-primary-foreground" : "border-input")}>
+                        {departments.includes(d) && <Check className="h-3 w-3" />}
+                      </div>
+                      <input type="checkbox" checked={departments.includes(d)} onChange={() => toggleArrayItem(setDepartments, d)} className="hidden" />
+                      {d}
+                    </label>
+                  ))}
+                </div>
+              </FilterBlock>
+              
+              <FilterBlock title="Availability">
+                <div className="space-y-2">
+                  {["Available", "Sold", "Reserved"].map((a) => (
+                    <label key={a} className="flex cursor-pointer items-center gap-2 text-sm">
+                      <div className={cn("grid h-4 w-4 place-items-center rounded border transition", availabilities.includes(a) ? "border-primary bg-primary text-primary-foreground" : "border-input")}>
+                        {availabilities.includes(a) && <Check className="h-3 w-3" />}
+                      </div>
+                      <input type="checkbox" checked={availabilities.includes(a)} onChange={() => toggleArrayItem(setAvailabilities, a)} className="hidden" />
+                      {a}
+                    </label>
+                  ))}
+                </div>
               </FilterBlock>
 
-              <FilterBlock title="Trust">
-                <label className="flex cursor-pointer items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={verifiedOnly}
-                    onChange={(e) => setVerifiedOnly(e.target.checked)}
-                    className="h-4 w-4 rounded accent-[var(--primary)]"
-                  />
-                  Verified sellers only
-                </label>
+              <FilterBlock title="Campus" defaultOpen={false}>
+                <div className="space-y-2">
+                  {CAMPUSES.map((campus) => (
+                    <label key={campus} className="flex cursor-pointer items-center gap-2 text-sm">
+                      <div className={cn("grid h-4 w-4 place-items-center rounded border transition", selectedCampuses.includes(campus) ? "border-primary bg-primary text-primary-foreground" : "border-input")}>
+                        {selectedCampuses.includes(campus) && <Check className="h-3 w-3" />}
+                      </div>
+                      <input type="checkbox" checked={selectedCampuses.includes(campus)} onChange={() => toggleArrayItem(setSelectedCampuses, campus)} className="hidden" />
+                      <MapPin className="h-3 w-3 text-muted-foreground" />
+                      {campus}
+                    </label>
+                  ))}
+                </div>
+              </FilterBlock>
+
+              <FilterBlock title="Trust & Status" defaultOpen={false}>
+                <div className="space-y-3">
+                  <label className="flex cursor-pointer items-center gap-2 text-sm">
+                    <div className={cn("grid h-4 w-4 place-items-center rounded border transition", verifiedOnly ? "border-primary bg-primary text-primary-foreground" : "border-input")}>
+                      {verifiedOnly && <Check className="h-3 w-3" />}
+                    </div>
+                    <input type="checkbox" checked={verifiedOnly} onChange={(e) => setVerifiedOnly(e.target.checked)} className="hidden" />
+                    Verified sellers only
+                  </label>
+                  <label className="flex cursor-pointer items-center gap-2 text-sm">
+                    <div className={cn("grid h-4 w-4 place-items-center rounded border transition", recentlyAdded ? "border-primary bg-primary text-primary-foreground" : "border-input")}>
+                      {recentlyAdded && <Check className="h-3 w-3" />}
+                    </div>
+                    <input type="checkbox" checked={recentlyAdded} onChange={(e) => setRecentlyAdded(e.target.checked)} className="hidden" />
+                    Recently added
+                  </label>
+                </div>
               </FilterBlock>
             </div>
           </aside>
@@ -194,11 +301,30 @@ function MarketplacePage() {
   );
 }
 
-function FilterBlock({ title, children }: { title: string; children: React.ReactNode }) {
+function FilterBlock({ title, children, defaultOpen = true }: { title: string; children: React.ReactNode; defaultOpen?: boolean }) {
+  const [open, setOpen] = useState(defaultOpen);
   return (
-    <div>
-      <div className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">{title}</div>
-      {children}
+    <div className="border-b border-border/60 py-3 last:border-0 last:pb-0">
+      <button 
+        onClick={() => setOpen(!open)}
+        className="flex w-full items-center justify-between text-sm font-semibold text-foreground hover:text-primary transition-colors"
+      >
+        {title}
+        <ChevronDown className={cn("h-4 w-4 text-muted-foreground transition-transform duration-200", open && "rotate-180")} />
+      </button>
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden"
+          >
+            <div className="pt-4 pb-1">{children}</div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

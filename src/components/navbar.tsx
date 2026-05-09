@@ -54,18 +54,23 @@ export function Navbar() {
         </Link>
 
         <nav className="hidden items-center gap-1 md:flex">
-          {links.map((l) => (
-            <Link
-              key={l.to}
-              to={l.to}
-              className={cn(
-                "rounded-full px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground",
-                path.startsWith(l.to) && "bg-secondary text-foreground",
-              )}
-            >
-              {l.label}
-            </Link>
-          ))}
+          {links.map((l) => {
+            const isActive = path.startsWith(l.to);
+            return (
+              <Link
+                key={l.to}
+                to={l.to}
+                className={cn(
+                  "relative rounded-full px-4 py-2 text-sm transition-all duration-200",
+                  isActive
+                    ? "text-[#064e3b] dark:text-[#34d399] font-bold bg-[#10b981]/15 dark:bg-[#059669]/20"
+                    : "font-medium text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
+                )}
+              >
+                {l.label}
+              </Link>
+            );
+          })}
         </nav>
 
         <div className="flex items-center gap-2">
@@ -210,12 +215,20 @@ export function Navbar() {
             className="border-t border-border/60 md:hidden"
           >
             <div className="mx-auto flex max-w-7xl flex-col gap-1 p-4">
-              {links.map((l) => (
-                <Link key={l.to} to={l.to} onClick={() => setOpen(false)}
-                  className="rounded-lg px-3 py-2 text-sm font-medium hover:bg-secondary">
-                  {l.label}
-                </Link>
-              ))}
+              {links.map((l) => {
+                const isActive = path.startsWith(l.to);
+                return (
+                  <Link key={l.to} to={l.to} onClick={() => setOpen(false)}
+                    className={cn(
+                      "rounded-lg px-3 py-2 text-sm transition-all duration-200",
+                      isActive
+                        ? "text-[#064e3b] dark:text-[#34d399] font-bold bg-[#10b981]/15 dark:bg-[#059669]/20"
+                        : "font-medium text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
+                    )}>
+                    {l.label}
+                  </Link>
+                );
+              })}
               <div className="mt-2 flex gap-2">
                 <Link to="/login" className="flex-1"><Button variant="outline" className="w-full">Sign in</Button></Link>
                 <Link to="/signup" className="flex-1"><Button className="w-full bg-brand-gradient">Get started</Button></Link>
