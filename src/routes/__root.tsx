@@ -12,6 +12,7 @@ import { ThemeProvider } from "@/lib/theme";
 import { Toaster } from "@/components/ui/sonner";
 import { WishlistProvider } from "@/lib/wishlist";
 import { CampusProvider } from "@/lib/campus";
+import { AuthProvider } from "@/lib/auth";
 import { products } from "@/lib/mock-data";
 import { BackToTop } from "@/components/back-to-top";
 import appCss from "../styles.css?url";
@@ -78,10 +79,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "SmartCampus — The Trusted Marketplace for Students" },
+      { title: "SmartCampus â€” The Trusted Marketplace for Students" },
       { name: "description", content: "Buy, sell, rent and exchange books, gadgets, notes and essentials with verified students across your campus." },
       { name: "author", content: "SmartCampus" },
-      { property: "og:title", content: "SmartCampus — The Trusted Marketplace for Students" },
+      { property: "og:title", content: "SmartCampus â€” The Trusted Marketplace for Students" },
       { property: "og:description", content: "Buy, sell, rent and exchange resources with verified students on your campus." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
@@ -121,11 +122,13 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <CampusProvider>
-          <WishlistProvider products={products}>
-            <Outlet />
-            <BackToTop />
-            <Toaster />
-          </WishlistProvider>
+          <AuthProvider>
+            <WishlistProvider products={products}>
+              <Outlet />
+              <BackToTop />
+              <Toaster />
+            </WishlistProvider>
+          </AuthProvider>
         </CampusProvider>
       </ThemeProvider>
     </QueryClientProvider>

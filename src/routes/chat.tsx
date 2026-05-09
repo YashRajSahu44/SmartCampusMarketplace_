@@ -20,11 +20,12 @@ import {
   CheckCheck,
   Plus,
   X,
+  Bot,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Navbar } from "@/components/navbar";
 import { Button } from "@/components/ui/button";
-import { conversations, sampleMessages } from "@/lib/mock-data";
+import { conversations } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
 import {
   DropdownMenu,
@@ -34,97 +35,181 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { buildFallbackUserProfile, useCurrentUserProfile } from "@/lib/user-profile";
+import { useAuth } from "@/lib/auth";
+import {
+  getChatSocket,
+  type ChatAttachment,
+  type ChatMessage,
+  type ChatThread,
+} from "@/lib/chat-socket";
 
 export const Route = createFileRoute("/chat")({ component: ChatPage });
-
-type Delivery = "sending" | "sent" | "delivered" | "seen";
-type Attachment = {
-  id: string;
-  file: File;
-  kind: "image" | "file";
-  previewUrl?: string;
-};
-
-type ChatMessage = {
-  id: string;
-  from: "me" | "them";
-  text: string;
-  time: string;
-  edited?: boolean;
-  delivery?: Delivery;
-  replyTo?: { id: string; text: string; from: "me" | "them" };
-  attachments?: { id: string; kind: "image" | "file"; name: string; size: number; previewUrl?: string }[];
-  reactions?: Record<string, { count: number; mine?: boolean }>;
-};
 
 const EMOJIS = ["👍", "❤️", "😂", "🔥", "👏", "😮", "😅", "🙏", "🎉", "✅", "💯", "✨"];
 
 function ChatPage() {
+  const socket = useMemo(() => getChatSocket(), []);
+  const { user, loading: authLoading } = useAuth();
+  const profileQuery = useCurrentUserProfile();
+  const profile = profileQuery.data ?? (user ? buildFallbackUserProfile(user) : null);
+
+  const [threads, setThreads] = useState<ChatThread[]>(() => conversations);
   const [activeId, setActiveId] = useState(conversations[0].id);
   const [showThread, setShowThread] = useState(false);
-  const active = conversations.find((c) => c.id === activeId)!;
+  const active = threads.find((c) => c.id === activeId) ?? threads[0];
   const bottomRef = useRef<HTMLDivElement | null>(null);
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const isAutoScrollRef = useRef(true);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const folderInputRef = useRef<HTMLInputElement | null>(null);
+  const typingTimerRef = useRef<number | null>(null);
 
   const [text, setText] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [replyTo, setReplyTo] = useState<ChatMessage["replyTo"] | null>(null);
-  const [pending, setPending] = useState<Attachment[]>([]);
+  const [pending, setPending] = useState<ChatAttachment[]>([]);
   const [typing, setTyping] = useState(false);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [aiInput, setAiInput] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiMessages, setAiMessages] = useState<Array<{ role: "user" | "assistant"; content: string }>>([]);
+  const activeIdRef = useRef(activeId);
+  const messagesRef = useRef(messages);
 
-  const [messages, setMessages] = useState<ChatMessage[]>(() =>
-    sampleMessages.map((m, idx) => ({
-      id: `seed-${idx}`,
-      from: m.from as "me" | "them",
-      text: m.text,
-      time: m.time,
-      delivery: m.from === "me" ? (idx < sampleMessages.length - 1 ? "seen" : "delivered") : undefined,
-    })),
-  );
+  useEffect(() => {
+    activeIdRef.current = activeId;
+  }, [activeId]);
+
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
 
   const revokeMessagePreviews = (ms: ChatMessage[]) => {
     ms.forEach((m) => m.attachments?.forEach((a) => a.previewUrl && URL.revokeObjectURL(a.previewUrl)));
   };
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    // only auto-scroll if user is near bottom or the last message is from the current user
+    const last = messages.at(-1);
+    const lastFromMe = last ? last.from === currentUser.id || last.from === "me" : false;
+    const shouldAuto = isAutoScrollRef.current || lastFromMe;
+    if (!shouldAuto) return;
+
+    // wait for DOM updates and any images to settle
+    requestAnimationFrame(() => requestAnimationFrame(() => container.scrollTo({ top: container.scrollHeight, behavior: "smooth" })));
   }, [messages.length, typing, pending.length, replyTo?.id, editingId]);
 
   useEffect(() => {
-    // Clear compose state when switching chats (UI-only demo behavior)
-    revokeMessagePreviews(messages);
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const onScroll = () => {
+      const threshold = 64; // px
+      const nearBottom = container.scrollTop + container.clientHeight + threshold >= container.scrollHeight;
+      isAutoScrollRef.current = nearBottom;
+    };
+
+    container.addEventListener("scroll", onScroll, { passive: true });
+    return () => container.removeEventListener("scroll", onScroll);
+  }, []);
+
+  useEffect(() => {
+    if (!socket.connected) {
+      socket.connect();
+    }
+
+    const handleThreads = ({ threads: nextThreads }: { threads: ChatThread[] }) => {
+      setThreads(nextThreads);
+    };
+
+    const handleThreadMessages = ({ thread, messages: nextMessages }: { thread: ChatThread; messages: ChatMessage[] }) => {
+      if (thread.id !== activeIdRef.current) return;
+      setMessages(nextMessages);
+    };
+
+    const handleThreadUpdate = ({ thread, messages: nextMessages }: { thread: ChatThread; messages: ChatMessage[] }) => {
+      const threadId = thread.id;
+      setThreads((current) =>
+        current.map((thread) =>
+          thread.id === threadId
+            ? { ...thread, lastMsg: nextMessages.at(-1)?.text ?? thread.lastMsg, time: nextMessages.at(-1)?.time ?? thread.time }
+            : thread,
+        ),
+      );
+      if (threadId === activeIdRef.current) {
+        setMessages(nextMessages);
+      }
+    };
+
+    socket.on("chat:threads", handleThreads);
+    socket.on("chat:thread:messages", handleThreadMessages);
+    socket.on("chat:thread:update", handleThreadUpdate);
+    socket.emit("chat:threads:load");
+
+    return () => {
+      socket.off("chat:threads", handleThreads);
+      socket.off("chat:thread:messages", handleThreadMessages);
+      socket.off("chat:thread:update", handleThreadUpdate);
+      socket.disconnect();
+    };
+  }, [socket]);
+
+  const messageById = useMemo(() => new Map(messages.map((m) => [m.id, m])), [messages]);
+
+  const currentUser = useMemo(
+    () => ({
+      id: profile?.firebaseUid ?? user?.uid ?? "guest",
+      name: profile?.displayName ?? user?.displayName ?? "You",
+      avatar: profile?.photoUrl ?? user?.photoURL ?? null,
+    }),
+    [profile, user],
+  );
+
+  const AI_AVATAR = "https://avatars.dicebear.com/api/identicon/ai-assistant.svg";
+  const AI_NAME = "AI Assistant";
+
+  useEffect(() => {
+    if (authLoading) return;
+
+    revokeMessagePreviews(messagesRef.current);
+    setMessages([]);
+    socket.emit("chat:thread:join", {
+      threadId: activeId,
+      user: currentUser,
+    });
     setText("");
     setEditingId(null);
     setReplyTo(null);
     setTyping(false);
-    setPending((p) => {
-      p.forEach((a) => a.previewUrl && URL.revokeObjectURL(a.previewUrl));
+    setPending((current) => {
+      current.forEach((attachment) => attachment.previewUrl && URL.revokeObjectURL(attachment.previewUrl));
       return [];
     });
-    setMessages(
-      sampleMessages.map((m, idx) => ({
-        id: `seed-${activeId}-${idx}`,
-        from: m.from as "me" | "them",
-        text: m.text,
-        time: m.time,
-        delivery: m.from === "me" ? (idx < sampleMessages.length - 1 ? "seen" : "delivered") : undefined,
-      })),
-    );
-  }, [activeId]);
+  }, [activeId, authLoading, currentUser, socket]);
 
-  const messageById = useMemo(() => new Map(messages.map((m) => [m.id, m])), [messages]);
+  useEffect(() => {
+    return () => {
+      if (typingTimerRef.current) {
+        window.clearTimeout(typingTimerRef.current);
+      }
+    };
+  }, []);
 
   const onPickFiles = (files: FileList | null, kind: "file" | "image") => {
     if (!files?.length) return;
-    const next: Attachment[] = Array.from(files).slice(0, 6).map((file) => {
+    const next: ChatAttachment[] = Array.from(files).slice(0, 6).map((file) => {
       const isImage = kind === "image" || file.type.startsWith("image/");
       const previewUrl = isImage ? URL.createObjectURL(file) : undefined;
       return {
         id: crypto.randomUUID(),
-        file,
         kind: isImage ? "image" : "file",
+        name: file.name,
+        size: file.size,
         previewUrl,
       };
     });
@@ -152,22 +237,7 @@ function ChatPage() {
   };
 
   const toggleReaction = (messageId: string, emoji: string) => {
-    setMessages((ms) =>
-      ms.map((m) => {
-        if (m.id !== messageId) return m;
-        const cur = m.reactions ?? {};
-        const entry = cur[emoji];
-        if (!entry) return { ...m, reactions: { ...cur, [emoji]: { count: 1, mine: true } } };
-        if (entry.mine) {
-          const nextCount = entry.count - 1;
-          const next = { ...cur };
-          if (nextCount <= 0) delete next[emoji];
-          else next[emoji] = { count: nextCount, mine: false };
-          return { ...m, reactions: next };
-        }
-        return { ...m, reactions: { ...cur, [emoji]: { count: entry.count + 1, mine: true } } };
-      }),
-    );
+    socket.emit("chat:message:react", { threadId: activeId, messageId, emoji, user: currentUser });
   };
 
   const beginReply = (m: ChatMessage) =>
@@ -180,28 +250,19 @@ function ChatPage() {
   };
 
   const deleteMessage = (id: string) =>
-    setMessages((ms) => {
-      const target = ms.find((m) => m.id === id);
-      target?.attachments?.forEach((a) => a.previewUrl && URL.revokeObjectURL(a.previewUrl));
-      return ms.filter((m) => m.id !== id);
-    });
+    socket.emit("chat:message:delete", { threadId: activeId, messageId: id, user: currentUser });
 
   const send = () => {
     const trimmed = text.trim();
     if (!trimmed && pending.length === 0) return;
 
-    const now = new Date();
-    const time = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-    const id = crypto.randomUUID();
-
     if (editingId) {
-      setMessages((ms) =>
-        ms.map((m) =>
-          m.id === editingId
-            ? { ...m, text: trimmed, edited: true, time, delivery: "delivered" }
-            : m,
-        ),
-      );
+      socket.emit("chat:message:edit", {
+        threadId: activeId,
+        messageId: editingId,
+        text: trimmed,
+        user: currentUser,
+      });
       setEditingId(null);
       setText("");
       return;
@@ -210,37 +271,106 @@ function ChatPage() {
     const attachments = pending.map((a) => ({
       id: a.id,
       kind: a.kind,
-      name: a.file.name,
-      size: a.file.size,
+      name: a.name,
+      size: a.size,
       previewUrl: a.previewUrl,
     }));
 
-    setMessages((ms) => [
-      ...ms,
-      {
-        id,
-        from: "me",
-        text: trimmed,
-        time,
-        delivery: "sending",
-        replyTo: replyTo ?? undefined,
-        attachments: attachments.length ? attachments : undefined,
-      },
-    ]);
+    socket.emit("chat:message:send", {
+      threadId: activeId,
+      user: currentUser,
+      text: trimmed,
+      replyTo: replyTo ?? undefined,
+      attachments: attachments.length ? attachments : undefined,
+    });
+
+    // Fire-and-forget: ask AI for a suggested reply and emit it as a separate 'AI' user
+    (async () => {
+      try {
+        const token = user ? await user.getIdToken() : "";
+        const resp = await fetch("/api/ai/chat", {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            authorization: token ? `Bearer ${token}` : "",
+          },
+          body: JSON.stringify({
+            messages: [
+              { role: "system", content: "You are a concise assistant for a campus marketplace chat." },
+              { role: "user", content: trimmed },
+            ],
+          }),
+        });
+
+        const payload = (await resp.json().catch(() => ({}))) as { ok?: boolean; content?: string };
+        if (resp.ok && payload?.ok && payload.content) {
+          socket.emit("chat:message:send", {
+            threadId: activeId,
+            user: { id: "ai", name: AI_NAME, avatar: AI_AVATAR },
+            text: payload.content,
+          });
+        }
+      } catch {
+        // ignore AI failures — UI remains functional
+      }
+    })();
 
     setReplyTo(null);
     setText("");
     setPending((p) => p.filter(() => false));
+    setTyping(true);
+    if (typingTimerRef.current) {
+      window.clearTimeout(typingTimerRef.current);
+    }
+    typingTimerRef.current = window.setTimeout(() => setTyping(false), 1400);
+  };
 
-    // Simulated delivery/seen + typing indicator (UI only)
-    setTimeout(() => {
-      setMessages((ms) => ms.map((m) => (m.id === id ? { ...m, delivery: "delivered" } : m)));
-    }, 450);
-    setTimeout(() => setTyping(true), 700);
-    setTimeout(() => {
-      setTyping(false);
-      setMessages((ms) => ms.map((m) => (m.id === id ? { ...m, delivery: "seen" } : m)));
-    }, 1600);
+  const sendAiMessage = async () => {
+    const prompt = aiInput.trim();
+    if (!prompt || aiLoading) return;
+
+    const nextMessages = [...aiMessages, { role: "user" as const, content: prompt }];
+    setAiMessages(nextMessages);
+    setAiInput("");
+    setAiLoading(true);
+
+    try {
+      const token = user ? await user.getIdToken() : "";
+      const response = await fetch("/api/ai/chat", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: token ? `Bearer ${token}` : "",
+        },
+        body: JSON.stringify({
+          messages: [
+            {
+              role: "system",
+              content:
+                "You are a concise assistant for a campus marketplace chat. Help users draft replies, negotiate politely, and propose safe meetup wording.",
+            },
+            ...nextMessages,
+          ],
+        }),
+      });
+
+      const payload = (await response.json().catch(() => ({}))) as { ok?: boolean; content?: string };
+      if (!response.ok || !payload.ok || !payload.content) {
+        throw new Error("AI response failed");
+      }
+
+      setAiMessages((current) => [...current, { role: "assistant", content: payload.content ?? "" }]);
+    } catch {
+      setAiMessages((current) => [
+        ...current,
+        {
+          role: "assistant",
+          content: "I could not respond right now. Please check your OpenRouter key setup and try again.",
+        },
+      ]);
+    } finally {
+      setAiLoading(false);
+    }
   };
 
   return (
@@ -258,7 +388,12 @@ function ChatPage() {
               </div>
             </div>
             <ul className="flex-1 overflow-y-auto">
-              {conversations.map((c) => (
+              {threads.length === 0 ? (
+                <li className="p-6 text-center text-sm text-muted-foreground">
+                  No conversations yet. Messages will appear after a real chat starts.
+                </li>
+              ) : null}
+              {threads.map((c) => (
                 <li key={c.id}>
                   <button
                     onClick={() => { setActiveId(c.id); setShowThread(true); }}
@@ -274,10 +409,10 @@ function ChatPage() {
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between">
                         <span className="truncate text-sm font-semibold">{c.name}</span>
-                        <span className="text-[10px] text-muted-foreground">{c.time}</span>
+                        <span className="text-[10px] text-muted-foreground">{c.time || ""}</span>
                       </div>
                       <div className="text-[11px] text-primary">{c.product}</div>
-                      <div className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">{c.lastMsg}</div>
+                      <div className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">{c.lastMsg || "No messages yet"}</div>
                     </div>
                     {c.unread > 0 && (
                       <span className="grid h-5 min-w-[20px] place-items-center rounded-full bg-primary px-1.5 text-[10px] font-semibold text-primary-foreground">
@@ -309,12 +444,12 @@ function ChatPage() {
               <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
             </header>
 
-            <div className="flex-1 space-y-3 overflow-y-auto bg-background/40 p-5">
+            <div ref={scrollContainerRef} className="flex-1 space-y-3 overflow-y-auto bg-background/40 p-5">
               <div className="mx-auto max-w-md rounded-2xl border border-dashed border-border bg-card p-3 text-center text-xs text-muted-foreground">
                 You're chatting about <span className="font-semibold text-foreground">{active.product}</span>. Stay safe — meet only on campus.
               </div>
               {messages.map((m, i) => {
-                const isMe = m.from === "me";
+                const isMe = m.from === "me" || m.from === currentUser.id;
                 const reply = m.replyTo ? messageById.get(m.replyTo.id) : null;
                 const timeMeta = (
                   <div
@@ -347,7 +482,13 @@ function ChatPage() {
                     transition={{ delay: i * 0.03 }}
                     className={cn("flex items-end gap-2", isMe ? "justify-end" : "justify-start")}
                   >
-                    {!isMe ? <img src={active.avatar} alt="" className="hidden h-7 w-7 rounded-full md:block" /> : null}
+                    {!isMe ? (
+                      <img
+                        src={m.authorAvatar ?? (m.from === "ai" ? AI_AVATAR : active.avatar)}
+                        alt=""
+                        className="hidden h-7 w-7 rounded-full md:block"
+                      />
+                    ) : null}
 
                     <div className={cn("group relative max-w-[78%]", isMe && "items-end")}>
                       {/* Hover actions */}
@@ -419,7 +560,7 @@ function ChatPage() {
                             )}
                           >
                             <div className={cn("mb-0.5 text-[11px] font-semibold", isMe ? "opacity-90" : "text-foreground")}>
-                              Replying to {m.replyTo.from === "me" ? "you" : active.name}
+                              Replying to {m.replyTo.from === "me" || m.replyTo.from === currentUser.id ? "you" : m.replyTo.from === "ai" ? AI_NAME : active.name}
                             </div>
                             <div className="line-clamp-2">{reply?.text ?? m.replyTo.text}</div>
                           </div>
@@ -514,6 +655,53 @@ function ChatPage() {
                   <MapPin className="h-3.5 w-3.5 text-foreground" /> Suggested: Central Library entrance
                 </div>
               </div>
+
+              <div className="mx-auto w-full max-w-md rounded-2xl border border-border bg-card p-4">
+                <div className="flex items-center gap-2 text-xs font-semibold">
+                  <Bot className="h-3.5 w-3.5 text-foreground" /> AI assistant
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Draft replies, negotiation wording, and meetup messages.
+                </p>
+
+                <div className="mt-3 max-h-44 space-y-2 overflow-y-auto rounded-xl border border-border bg-background p-3">
+                  {aiMessages.length === 0 ? (
+                    <div className="text-xs text-muted-foreground">Try: "Draft a polite price negotiation reply"</div>
+                  ) : (
+                    aiMessages.map((message, index) => (
+                      <div
+                        key={`${message.role}-${index}`}
+                        className={cn(
+                          "rounded-lg px-2.5 py-2 text-xs",
+                          message.role === "user"
+                            ? "ml-6 bg-primary/10 text-foreground"
+                            : "mr-6 bg-secondary text-foreground",
+                        )}
+                      >
+                        {message.content}
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                <div className="mt-3 flex items-center gap-2">
+                  <input
+                    value={aiInput}
+                    onChange={(event) => setAiInput(event.target.value)}
+                    placeholder="Ask assistant..."
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-xs outline-none focus:border-primary"
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" && !event.shiftKey) {
+                        event.preventDefault();
+                        void sendAiMessage();
+                      }
+                    }}
+                  />
+                  <Button size="icon" type="button" disabled={aiLoading} onClick={() => void sendAiMessage()}>
+                    <Send className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </div>
               <div ref={bottomRef} />
             </div>
 
@@ -558,14 +746,14 @@ function ChatPage() {
                       className="group relative overflow-hidden rounded-2xl border border-border bg-card shadow-soft"
                     >
                       {a.kind === "image" && a.previewUrl ? (
-                        <img src={a.previewUrl} alt={a.file.name} className="h-20 w-20 object-cover" />
+                        <img src={a.previewUrl} alt={a.name} className="h-20 w-20 object-cover" />
                       ) : (
                         <div className="flex h-20 w-56 items-center gap-3 px-3">
                           <Paperclip className="h-4 w-4 text-muted-foreground" />
                           <div className="min-w-0">
-                            <div className="truncate text-xs font-semibold">{a.file.name}</div>
+                            <div className="truncate text-xs font-semibold">{a.name}</div>
                             <div className="text-[11px] text-muted-foreground">
-                              {Math.max(1, Math.round(a.file.size / 1024))} KB
+                              {Math.max(1, Math.round(a.size / 1024))} KB
                             </div>
                           </div>
                         </div>

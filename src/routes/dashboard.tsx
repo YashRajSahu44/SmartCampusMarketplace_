@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { motion } from "framer-motion";
 import {
   TrendingUp, Eye, MessageCircle, Heart, Package, ShoppingBag,
@@ -19,7 +19,10 @@ import {
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid,
 } from "recharts";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { buildFallbackUserProfile, useCurrentUserProfile } from "@/lib/user-profile";
+import { useAuth } from "@/lib/auth";
+import AccountOverview from "@/components/account-overview";
 
 export const Route = createFileRoute("/dashboard")({ component: DashboardPage });
 
@@ -30,7 +33,12 @@ const chartData = [
   { d: "Sun", views: 260, msgs: 12 },
 ];
 
+
+
 function DashboardPage() {
+  const navigate = useNavigate();
+  const { user, loading: authLoading, signOut } = useAuth();
+  const profileQuery = useCurrentUserProfile();
   const rentals = useMemo(() => products.filter((p) => p.forRent).slice(0, 4), []);
   const [returnOpen, setReturnOpen] = useState(false);
   const [selectedRentalId, setSelectedRentalId] = useState<string | null>(null);
@@ -47,8 +55,46 @@ function DashboardPage() {
     });
     return init;
   });
+  const profile = profileQuery.data ?? (user ? buildFallbackUserProfile(user) : null);
+
+  useEffect(() => {
+    if (!authLoading && !user) {
+      navigate({ to: "/login", replace: true });
+    }
+  }, [authLoading, navigate, user]);
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate({ to: "/" });
+  };
+
+  const displayName = profile?.displayName ?? user?.displayName ?? "Student";
+  const email = profile?.email ?? user?.email ?? "No email on file";
+  const avatarLabel = displayName
+    .split(" ")
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase();
 
   const selectedRental = selectedRentalId ? products.find((p) => p.id === selectedRentalId) : null;
+
+  if (authLoading && !user) {
+    return (
+      <div className="flex min-h-screen flex-col">
+        <Navbar />
+        <main className="flex-1">
+          <div className="mx-auto flex max-w-7xl items-center justify-center px-4 py-24 sm:px-6 lg:px-8">
+            <div className="rounded-2xl border border-border bg-card px-6 py-10 text-center shadow-soft">
+              <div className="text-sm font-semibold">Loading your dashboard</div>
+              <div className="mt-1 text-xs text-muted-foreground">Fetching your account and profile details.</div>
+            </div>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -56,13 +102,33 @@ function DashboardPage() {
       <main className="flex-1">
         <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
           <div className="flex flex-wrap items-end justify-between gap-4">
-            <div>
-              <p className="text-sm text-muted-foreground">Welcome back, Aarav</p>
+            <div className="flex items-center gap-4">
+              <div className="grid h-14 w-14 place-items-center rounded-2xl bg-brand-gradient text-lg font-semibold text-primary-foreground shadow-elegant">
+                {profile?.photoUrl ? (
+                  <img src={profile.photoUrl} alt="" className="h-full w-full rounded-2xl object-cover" />
+                ) : (
+                  avatarLabel
+                )}
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Welcome back, {displayName}</p>
               <h1 className="mt-1 font-display text-3xl font-semibold italic tracking-tight sm:text-4xl">Your dashboard</h1>
+                <p className="mt-1 text-xs text-muted-foreground">Signed in as {email}</p>
+              </div>
             </div>
-            <Button className="rounded-full bg-brand-gradient text-primary-foreground shadow-elegant hover:opacity-90">
-              <Plus className="h-4 w-4" /> New listing
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Link to="/marketplace">
+                <Button variant="outline" className="rounded-full">
+                  Browse marketplace
+                </Button>
+              </Link>
+              <Button className="rounded-full bg-brand-gradient text-primary-foreground shadow-elegant hover:opacity-90">
+                <Plus className="h-4 w-4" /> New listing
+              </Button>
+              <Button variant="ghost" className="rounded-full" onClick={handleSignOut}>
+                Sign out
+              </Button>
+            </div>
           </div>
 
           {/* Stats */}
@@ -89,6 +155,32 @@ function DashboardPage() {
                 <div className="text-xs text-muted-foreground">{s.label}</div>
               </motion.div>
             ))}
+          </div>
+
+          <div className="mt-8 grid gap-6 lg:grid-cols-[1.3fr_0.7fr]">
+            <div className="rounded-2xl border border-border bg-card p-6 shadow-soft">
+              <AccountOverview profile={profile} />
+            </div>
+
+            <div className="rounded-2xl border border-border bg-card p-6 shadow-soft">
+              <h3 className="text-sm font-semibold">Quick actions</h3>
+              <p className="text-xs text-muted-foreground">Shortcuts tied to your account</p>
+              <div className="mt-5 grid gap-3">
+                <Link to="/marketplace">
+                  <Button variant="outline" className="w-full justify-start rounded-xl">
+                    <ShoppingBag className="h-4 w-4" /> Browse marketplace
+                  </Button>
+                </Link>
+                <Link to="/chat">
+                  <Button variant="outline" className="w-full justify-start rounded-xl">
+                    <MessageCircle className="h-4 w-4" /> Open messages
+                  </Button>
+                </Link>
+                <Button className="w-full justify-start rounded-xl bg-brand-gradient text-primary-foreground shadow-soft hover:opacity-90">
+                  <BadgeCheck className="h-4 w-4" /> Verify profile status
+                </Button>
+              </div>
+            </div>
           </div>
 
           <div className="mt-8 grid gap-6 lg:grid-cols-3">
