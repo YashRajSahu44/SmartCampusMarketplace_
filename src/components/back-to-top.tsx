@@ -25,9 +25,10 @@ export function BackToTop() {
           whileHover={{ y: -2, scale: 1.02 }}
           whileTap={{ scale: 0.96 }}
           onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-          className="fixed bottom-5 right-5 z-[80] grid h-11 w-11 place-items-center rounded-full border border-border bg-background/85 text-foreground shadow-soft backdrop-blur md:bottom-6 md:right-6 md:h-12 md:w-12"
+          className="fixed left-1/2 top-6 z-[80] flex -translate-x-1/2 items-center gap-2 rounded-full border border-border bg-background/90 px-4 py-2 text-sm font-medium text-foreground shadow-elegant backdrop-blur-md transition-all hover:-translate-y-1 hover:bg-secondary sm:top-8"
         >
-          <ArrowUp className="h-5 w-5" />
+          <ArrowUp className="h-4 w-4" />
+          <span>Back to top</span>
         </motion.button>
       ) : null}
     </AnimatePresence>
