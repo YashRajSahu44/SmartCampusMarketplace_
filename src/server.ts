@@ -2,12 +2,22 @@ import "./lib/error-capture";
 
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
+import { MongoClient } from "mongodb";
 
 type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
 };
 
+type AuthUser = {
+  localId?: string;
+  email?: string;
+  displayName?: string;
+  photoUrl?: string;
+  emailVerified?: boolean;
+};
+
 let serverEntryPromise: Promise<ServerEntry> | undefined;
+let mongoClientPromise: Promise<MongoClient> | undefined;
 
 async function getServerEntry(): Promise<ServerEntry> {
   if (!serverEntryPromise) {
@@ -75,16 +85,46 @@ async function lookupFirebaseUserByIdToken(idToken: string, env: unknown) {
   return payload.users?.[0] ?? null;
 }
 
-async function syncUserToMongo(
-  user: {
-    localId?: string;
-    email?: string;
-    displayName?: string;
-    photoUrl?: string;
-    emailVerified?: boolean;
-  },
-  env: unknown,
-) {
+function getMongoClient(uri: string): Promise<MongoClient> {
+  if (!mongoClientPromise) {
+    mongoClientPromise = new MongoClient(uri).connect();
+  }
+
+  return mongoClientPromise;
+}
+
+async function syncUserWithMongoDriver(user: AuthUser, env: unknown) {
+  const mongoUri = getEnvValue(env, "MONGO_URI");
+  const database = getEnvValue(env, "MONGODB_DATABASE");
+  const collection = getEnvValue(env, "MONGODB_USERS_COLLECTION") ?? "users";
+
+  if (!mongoUri || !database) {
+    throw new Error("Missing MONGO_URI or MONGODB_DATABASE for MongoDB driver sync.");
+  }
+
+  const client = await getMongoClient(mongoUri);
+  const now = new Date().toISOString();
+
+  await client.db(database).collection(collection).updateOne(
+    { firebaseUid: user.localId },
+    {
+      $set: {
+        email: user.email ?? null,
+        displayName: user.displayName ?? null,
+        photoUrl: user.photoUrl ?? null,
+        emailVerified: Boolean(user.emailVerified),
+        lastLoginAt: now,
+      },
+      $setOnInsert: {
+        firebaseUid: user.localId,
+        createdAt: now,
+      },
+    },
+    { upsert: true },
+  );
+}
+
+async function syncUserWithDataApi(user: AuthUser, env: unknown) {
   const dataApiUrl = getEnvValue(env, "MONGODB_DATA_API_URL");
   const dataApiKey = getEnvValue(env, "MONGODB_DATA_API_KEY");
   const dataSource = getEnvValue(env, "MONGODB_DATA_SOURCE");
@@ -132,6 +172,16 @@ async function syncUserToMongo(
   }
 
   return response;
+}
+
+async function syncUserToMongo(user: AuthUser, env: unknown) {
+  const mongoUri = getEnvValue(env, "MONGO_URI");
+
+  if (mongoUri) {
+    return syncUserWithMongoDriver(user, env);
+  }
+
+  return syncUserWithDataApi(user, env);
 }
 
 async function handleApiRequest(request: Request, env: unknown): Promise<Response | null> {
