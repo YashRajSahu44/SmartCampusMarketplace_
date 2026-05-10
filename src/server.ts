@@ -2,7 +2,6 @@ import "./lib/error-capture";
 
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
-import { MongoClient } from "mongodb";
 import { OpenRouter } from "@openrouter/sdk";
 
 type ServerEntry = {
@@ -51,8 +50,20 @@ type AiChatMessage = {
   content: string;
 };
 
+type DataApiConfig = {
+  url: string;
+  apiKey: string;
+  dataSource: string;
+  database: string;
+  collection: string;
+};
+
+type DataApiResponse<T> = {
+  document?: T | null;
+  documents?: T[];
+};
+
 let serverEntryPromise: Promise<ServerEntry> | undefined;
-let mongoClientPromise: Promise<MongoClient> | undefined;
 
 async function getServerEntry(): Promise<ServerEntry> {
   if (!serverEntryPromise) {
@@ -82,6 +93,40 @@ function getEnvValue(env: unknown, key: string): string | undefined {
   }
 
   return undefined;
+}
+
+function getDataApiConfig(env: unknown): DataApiConfig | null {
+  const url = getEnvValue(env, "MONGODB_DATA_API_URL");
+  const apiKey = getEnvValue(env, "MONGODB_DATA_API_KEY");
+  const dataSource = getEnvValue(env, "MONGODB_DATA_SOURCE");
+  const database = getEnvValue(env, "MONGODB_DATABASE");
+  const collection = getEnvValue(env, "MONGODB_USERS_COLLECTION") ?? "users";
+
+  if (!url || !apiKey || !dataSource || !database) {
+    return null;
+  }
+
+  return { url, apiKey, dataSource, database, collection };
+}
+
+async function callDataApi(
+  config: DataApiConfig,
+  action: string,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  return fetch(toDataApiActionUrl(config.url, action), {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "api-key": config.apiKey,
+    },
+    body: JSON.stringify({
+      dataSource: config.dataSource,
+      database: config.database,
+      collection: config.collection,
+      ...body,
+    }),
+  });
 }
 
 async function lookupFirebaseUserByIdToken(idToken: string, env: unknown) {
@@ -127,159 +172,57 @@ function toDataApiActionUrl(url: string, action: string) {
   return url.replace(/\/action\/[^/]+$/, `/action/${action}`);
 }
 
-function getMongoClient(uri: string): Promise<MongoClient> {
-  if (!mongoClientPromise) {
-    mongoClientPromise = new MongoClient(uri).connect();
+async function syncUserProfile(user: AuthUser, env: unknown) {
+  const config = getDataApiConfig(env);
+
+  if (!config) {
+    return;
   }
 
-  return mongoClientPromise;
-}
-
-async function syncUserWithMongoDriver(user: AuthUser, env: unknown) {
-  const mongoUri = getEnvValue(env, "MONGO_URI");
-  const database = getEnvValue(env, "MONGODB_DATABASE");
-  const collection = getEnvValue(env, "MONGODB_USERS_COLLECTION") ?? "users";
-
-  if (!mongoUri || !database) {
-    throw new Error("Missing MONGO_URI or MONGODB_DATABASE for MongoDB driver sync.");
-  }
-
-  const client = await getMongoClient(mongoUri);
   const now = new Date().toISOString();
-
-  await client
-    .db(database)
-    .collection(collection)
-    .updateOne(
-      { firebaseUid: user.localId },
-      {
-        $set: {
-          email: user.email ?? null,
-          displayName: user.displayName ?? null,
-          photoUrl: user.photoUrl ?? null,
-          emailVerified: Boolean(user.emailVerified),
-          lastLoginAt: now,
-        },
-        $setOnInsert: {
-          firebaseUid: user.localId,
-          createdAt: now,
-        },
+  const response = await callDataApi(config, "updateOne", {
+    filter: { firebaseUid: user.localId },
+    update: {
+      $set: {
+        email: user.email ?? null,
+        displayName: user.displayName ?? null,
+        photoUrl: user.photoUrl ?? null,
+        emailVerified: Boolean(user.emailVerified),
+        lastLoginAt: now,
       },
-      { upsert: true },
-    );
-}
-
-async function syncUserWithDataApi(user: AuthUser, env: unknown) {
-  const dataApiUrl = getEnvValue(env, "MONGODB_DATA_API_URL");
-  const dataApiKey = getEnvValue(env, "MONGODB_DATA_API_KEY");
-  const dataSource = getEnvValue(env, "MONGODB_DATA_SOURCE");
-  const database = getEnvValue(env, "MONGODB_DATABASE");
-  const collection = getEnvValue(env, "MONGODB_USERS_COLLECTION") ?? "users";
-
-  if (!dataApiUrl || !dataApiKey || !dataSource || !database) {
-    throw new Error(
-      "Missing MongoDB Data API configuration (MONGODB_DATA_API_URL, MONGODB_DATA_API_KEY, MONGODB_DATA_SOURCE, MONGODB_DATABASE).",
-    );
-  }
-
-  const now = new Date().toISOString();
-  const response = await fetch(dataApiUrl, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "api-key": dataApiKey,
+      $setOnInsert: {
+        firebaseUid: user.localId,
+        createdAt: now,
+      },
     },
-    body: JSON.stringify({
-      dataSource,
-      database,
-      collection,
-      filter: { firebaseUid: user.localId },
-      update: {
-        $set: {
-          email: user.email ?? null,
-          displayName: user.displayName ?? null,
-          photoUrl: user.photoUrl ?? null,
-          emailVerified: Boolean(user.emailVerified),
-          lastLoginAt: now,
-        },
-        $setOnInsert: {
-          firebaseUid: user.localId,
-          createdAt: now,
-        },
-      },
-      upsert: true,
-    }),
+    upsert: true,
   });
 
   if (!response.ok) {
     const body = await response.text();
     throw new Error(`MongoDB Data API request failed (${response.status}): ${body}`);
   }
-
-  return response;
 }
 
-async function readUserWithMongoDriver(userId: string, env: unknown) {
-  const mongoUri = getEnvValue(env, "MONGO_URI");
-  const database = getEnvValue(env, "MONGODB_DATABASE");
-  const collection = getEnvValue(env, "MONGODB_USERS_COLLECTION") ?? "users";
+async function readUserProfile(userId: string, env: unknown) {
+  const config = getDataApiConfig(env);
 
-  if (!mongoUri || !database) {
+  if (!config) {
     return null;
   }
 
-  const client = await getMongoClient(mongoUri);
-  return client
-    .db(database)
-    .collection<StoredUserProfile>(collection)
-    .findOne({ firebaseUid: userId }, { projection: { _id: 0 } });
-}
-
-async function readUserWithDataApi(userId: string, env: unknown) {
-  const dataApiUrl = getEnvValue(env, "MONGODB_DATA_API_URL");
-  const dataApiKey = getEnvValue(env, "MONGODB_DATA_API_KEY");
-  const dataSource = getEnvValue(env, "MONGODB_DATA_SOURCE");
-  const database = getEnvValue(env, "MONGODB_DATABASE");
-  const collection = getEnvValue(env, "MONGODB_USERS_COLLECTION") ?? "users";
-
-  if (!dataApiUrl || !dataApiKey || !dataSource || !database) {
-    return null;
-  }
-
-  const response = await fetch(toDataApiActionUrl(dataApiUrl, "findOne"), {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "api-key": dataApiKey,
-    },
-    body: JSON.stringify({
-      dataSource,
-      database,
-      collection,
-      filter: { firebaseUid: userId },
-      projection: { _id: 0 },
-    }),
+  const response = await callDataApi(config, "findOne", {
+    filter: { firebaseUid: userId },
+    projection: { _id: 0 },
   });
 
   if (!response.ok) {
     return null;
   }
 
-  const payload = (await response.json()) as {
-    document?: StoredUserProfile | null;
-  };
+  const payload = (await response.json()) as DataApiResponse<StoredUserProfile>;
 
   return payload.document ?? null;
-}
-
-async function readUserProfileFromMongo(userId: string, env: unknown) {
-  const mongoUri = getEnvValue(env, "MONGO_URI");
-
-  if (mongoUri) {
-    return readUserWithMongoDriver(userId, env);
-  }
-
-  return readUserWithDataApi(userId, env);
 }
 
 function buildUserProfile(user: AuthUser, storedProfile: StoredUserProfile | null) {
@@ -299,14 +242,69 @@ function buildUserProfile(user: AuthUser, storedProfile: StoredUserProfile | nul
   };
 }
 
-async function syncUserToMongo(user: AuthUser, env: unknown) {
-  const mongoUri = getEnvValue(env, "MONGO_URI");
+async function readWalletBalance(userId: string, env: unknown) {
+  const profile = await readUserProfile(userId, env);
+  return typeof profile?.walletBalance === "number" ? profile.walletBalance : 1000;
+}
 
-  if (mongoUri) {
-    return syncUserWithMongoDriver(user, env);
+async function readTransactions(userId: string, env: unknown) {
+  const config = getDataApiConfig(env);
+
+  if (!config) {
+    return [];
   }
 
-  return syncUserWithDataApi(user, env);
+  const response = await callDataApi(config, "find", {
+    filter: { $or: [{ senderId: userId }, { receiverId: userId }] },
+    sort: { createdAt: -1 },
+    limit: 50,
+  });
+
+  if (!response.ok) {
+    return [];
+  }
+
+  const payload = (await response.json()) as DataApiResponse<Record<string, unknown>>;
+  return payload.documents ?? [];
+}
+
+async function incrementWalletBalance(userId: string, amount: number, env: unknown) {
+  const config = getDataApiConfig(env);
+
+  if (!config) {
+    throw new Error("Missing MongoDB Data API configuration for wallet updates.");
+  }
+
+  const response = await callDataApi(config, "updateOne", {
+    filter: { firebaseUid: userId },
+    update: { $inc: { walletBalance: amount } },
+  });
+
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(`MongoDB Data API request failed (${response.status}): ${body}`);
+  }
+}
+
+async function insertTransaction(transaction: Record<string, unknown>, env: unknown) {
+  const config = getDataApiConfig(env);
+
+  if (!config) {
+    throw new Error("Missing MongoDB Data API configuration for transactions.");
+  }
+
+  const response = await callDataApi(config, "insertOne", {
+    document: transaction,
+  });
+
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(`MongoDB Data API request failed (${response.status}): ${body}`);
+  }
+}
+
+async function syncUserToMongo(user: AuthUser, env: unknown) {
+  return syncUserProfile(user, env);
 }
 
 async function completeAiChat(messages: AiChatMessage[], env: unknown) {
@@ -392,7 +390,7 @@ async function handleApiRequest(request: Request, env: unknown): Promise<Respons
 
       let storedProfile: StoredUserProfile | null = null;
       try {
-        storedProfile = await readUserProfileFromMongo(user.localId, env);
+        storedProfile = await readUserProfile(user.localId, env);
       } catch {
         storedProfile = null;
       }
@@ -460,8 +458,7 @@ async function handleApiRequest(request: Request, env: unknown): Promise<Respons
       const user = await lookupFirebaseUserByIdToken(token, env);
       if (!user?.localId) return new Response("Unauthorized", { status: 401 });
 
-      let profile = await readUserProfileFromMongo(user.localId, env);
-      const balance = typeof profile?.walletBalance === "number" ? profile.walletBalance : 1000;
+      const balance = await readWalletBalance(user.localId, env);
 
       return new Response(JSON.stringify({ ok: true, balance }), {
         status: 200,
@@ -477,18 +474,7 @@ async function handleApiRequest(request: Request, env: unknown): Promise<Respons
       const user = await lookupFirebaseUserByIdToken(token, env);
       if (!user?.localId) return new Response("Unauthorized", { status: 401 });
 
-      const mongoUri = getEnvValue(env, "MONGO_URI");
-      const database = getEnvValue(env, "MONGODB_DATABASE");
-      if (!mongoUri || !database) throw new Error("DB not configured");
-
-      const client = await getMongoClient(mongoUri);
-      const transactions = await client
-        .db(database)
-        .collection("transactions")
-        .find({ $or: [{ senderId: user.localId }, { receiverId: user.localId }] })
-        .sort({ createdAt: -1 })
-        .limit(50)
-        .toArray();
+      const transactions = await readTransactions(user.localId, env);
 
       return new Response(JSON.stringify({ ok: true, transactions }), {
         status: 200,
@@ -517,36 +503,21 @@ async function handleApiRequest(request: Request, env: unknown): Promise<Respons
         return new Response(JSON.stringify({ error: "Invalid transfer parameters" }), { status: 400 });
       }
 
-      const mongoUri = getEnvValue(env, "MONGO_URI");
-      const database = getEnvValue(env, "MONGODB_DATABASE");
-      if (!mongoUri || !database) throw new Error("DB not configured");
-
-      const client = await getMongoClient(mongoUri);
-      const db = client.db(database);
-
-      // We'll run this manually without a driver transaction for simplicity in the mock.
-      const senderProfile = await db.collection("users").findOne({ firebaseUid: user.localId });
-      const senderBalance = typeof senderProfile?.walletBalance === "number" ? senderProfile.walletBalance : 1000;
+      const senderProfile = await readUserProfile(user.localId, env);
+      const senderBalance =
+        typeof senderProfile?.walletBalance === "number" ? senderProfile.walletBalance : 1000;
 
       if (senderBalance < amount) {
         return new Response(JSON.stringify({ error: "Insufficient balance" }), { status: 400 });
       }
 
-      // Ensure both users exist with at least starting balances if they don't have one
-      const receiverProfile = await db.collection("users").findOne({ firebaseUid: body.receiverId });
+      const receiverProfile = await readUserProfile(body.receiverId, env);
       if (!receiverProfile) {
         return new Response(JSON.stringify({ error: "Receiver not found in db" }), { status: 400 });
       }
 
-      await db.collection("users").updateOne(
-        { firebaseUid: user.localId },
-        { $inc: { walletBalance: -amount } }
-      );
-
-      await db.collection("users").updateOne(
-        { firebaseUid: body.receiverId },
-        { $inc: { walletBalance: amount } }
-      );
+      await incrementWalletBalance(user.localId, -amount, env);
+      await incrementWalletBalance(body.receiverId, amount, env);
 
       const transaction = {
         id: crypto.randomUUID(),
@@ -556,10 +527,10 @@ async function handleApiRequest(request: Request, env: unknown): Promise<Respons
         type: body.type || "buy",
         description: body.description || "Transfer",
         referenceId: body.referenceId,
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
       };
 
-      await db.collection("transactions").insertOne(transaction);
+      await insertTransaction(transaction, env);
 
       return new Response(JSON.stringify({ ok: true, transaction }), {
         status: 200,
