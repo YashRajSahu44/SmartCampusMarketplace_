@@ -1,74 +1,119 @@
-# SmartCampus
+# 🏫 SmartCampus Marketplace
 
-SmartCampus is a lightweight marketplace and campus community web app with real-time chat, listings, and profile features. It uses a modern React + Vite + TypeScript stack with Firebase for auth/firestore, optional MongoDB Data API for server-side data, and a small Socket.IO chat server for peer messaging.
+> *Buy, sell & exchange within your campus.*
 
-Features
-- Marketplace listings and product pages
-- User profiles and public profile sync
-- Real-time chat (Socket.IO) and AI-assisted chat routes
-- Authentication with Firebase (Google + email)
+A lightweight campus community web app and marketplace built exclusively for verified students. Buy, sell, and exchange books, gadgets, notes, cycles, and hostel essentials — all from people you can actually meet.
 
-Documentation
-- Development guide: [DEVELOPMENT.md](DEVELOPMENT.md)
-- Architecture summary: [ARCHITECTURE.md](ARCHITECTURE.md)
-- Contribution guidelines: [CONTRIBUTING.md](CONTRIBUTING.md)
+Built at a hackathon by a team of 3.
 
-Quick start
+---
 
-Prerequisites
-- Node.js 18+ and a package manager (`npm`, `yarn`, or `pnpm`).
+## 🔗 Live Demo
 
-Install
+**[n3xtg3n.xyz](https://n3xtg3n.xyz/)**
+
+---
+
+## 📸 Preview
+
+![SmartCampus Preview](preview.png)
+
+---
+
+## ✨ Features
+
+- **Marketplace Listings** — Buy, sell, and request items within your campus
+- **User Profiles** — Public profile sync across the platform
+- **Real-time Chat** — Peer messaging powered by Socket.IO
+- **AI-assisted Chat Routes** — Smart chat interactions
+- **Authentication** — Google + email login via Firebase
+- **Dark Mode** — Clean dark UI out of the box
+- **Search** — Find books, gadgets, calculators, and more instantly
+
+---
+
+## 🛠️ Tech Stack
+
+### Frontend
+![React](https://img.shields.io/badge/React_v19-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)
+![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)
+![Vite](https://img.shields.io/badge/Vite-646CFF?style=for-the-badge&logo=vite&logoColor=white)
+![TailwindCSS](https://img.shields.io/badge/Tailwind_CSS_v4-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)
+![Radix UI](https://img.shields.io/badge/Radix_UI-161618?style=for-the-badge&logo=radix-ui&logoColor=white)
+
+### Backend
+![Node.js](https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)
+![Express](https://img.shields.io/badge/Express_v4-000000?style=for-the-badge&logo=express&logoColor=white)
+![MongoDB](https://img.shields.io/badge/MongoDB-4EA94B?style=for-the-badge&logo=mongodb&logoColor=white)
+![Socket.io](https://img.shields.io/badge/Socket.io-010101?style=for-the-badge&logo=socketdotio&logoColor=white)
+
+### Auth & Database
+![Firebase](https://img.shields.io/badge/Firebase-FFCA28?style=for-the-badge&logo=firebase&logoColor=black)
+![JWT](https://img.shields.io/badge/JWT-000000?style=for-the-badge&logo=jsonwebtokens&logoColor=white)
+
+### Deployment
+![Vercel](https://img.shields.io/badge/Vercel-000000?style=for-the-badge&logo=vercel&logoColor=white)
+
+---
+
+## 📁 Project Structure
+
+```
+SmartCampusMarketplace/
+├── src/                  # Frontend source (React + TypeScript)
+├── backend/              # Express API server
+├── chat-socket-server.mjs # Socket.IO chat server
+├── firestore.rules       # Firebase security rules
+├── vite.config.ts        # Vite configuration
+├── ARCHITECTURE.md       # System architecture overview
+├── DEVELOPMENT.md        # Dev setup guide
+└── CONTRIBUTING.md       # Contribution guidelines
+```
+
+---
+
+## 🚀 Getting Started
 
 ```bash
-# install dependencies
+# Clone the repository
+git clone https://github.com/YashRajSahu44/SmartCampusMarketplace_.git
+cd SmartCampusMarketplace_
+
+# Install dependencies
 npm install
-```
 
-Environment
-- Copy `.env.example` to `.env` and fill required keys before running in production. The project reads client-side variables prefixed with `VITE_` and server-side keys like `MONGODB_DATA_API_*` and `FIREBASE_WEB_API_KEY` where applicable. See [DEVELOPMENT.md](DEVELOPMENT.md) for details.
+# Set up environment variables
+cp .env.example .env
 
-Development
-
-```bash
-# Start the Vite dev server
+# Start development server
 npm run dev
-
-# (Optional) Start the independent chat socket server (used for some chat features)
-npm run chat:server
 ```
 
-Build & preview
+> See [DEVELOPMENT.md](DEVELOPMENT.md) for full setup instructions.
 
-```bash
-npm run build
-npm run preview
-```
+---
 
-Useful scripts
-- `npm run dev` — Run Vite development server
-- `npm run build` — Build production assets (output: `docs/` by default)
-- `npm run build:dev` — Build using development mode
-- `npm run preview` — Preview the built site locally
-- `npm run chat:server` — Run the standalone Socket.IO chat server (`chat-socket-server.mjs`)
-- `npm run test` — Run unit tests (`vitest`)
-- `npm run lint` — Run `eslint`
-- `npm run typecheck` — Run TypeScript `tsc` type checks
-- `npm run format` — Run `prettier` to format files
+## 📖 Documentation
 
-Testing
+- [Architecture Overview](ARCHITECTURE.md)
+- [Development Guide](DEVELOPMENT.md)
+- [Contributing Guidelines](CONTRIBUTING.md)
 
-Unit and component tests are powered by `vitest` and `@testing-library/react`. Run `npm run test` to execute the test suite.
+---
 
-Where to look in the codebase
-- Frontend entry: `src/` (routes, components, hooks, lib)
-- Server entry for SSR/API: `server.ts`
-- Independent chat server: `chat-socket-server.mjs`
-- Cloud / build config: `vite.config.ts`, `wrangler.jsonc` (if deploying to Cloudflare)
+## 👥 Team
 
-Contributing
-Please read [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines, branch strategy, and testing expectations.
+Built with ❤️ at a hackathon by:
 
-License
-This repository does not include a license file. If you plan to publish this project, add a `LICENSE` file to indicate how it may be used.
+| Name | GitHub |
+|---|---|
+| Yashraj Sahu | [@yashrajsahu44](https://github.com/yashrajsahu44) |
+| Divyansh Akya | [@divyanshakya966](https://github.com/divyanshakya966) |
+| Piyush | [@PIYUSH-NEXTGEN](https://github.com/PIYUSH-NEXTGEN) |
+
+---
+
+## 📄 License
+
+This project is open source and available 
 
